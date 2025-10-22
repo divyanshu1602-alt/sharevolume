@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Loading Company Shares...</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 text-gray-900 font-sans">
+    <div class="container mx-auto p-4 md:p-8">
+        <header class="text-center mb-10">
+            <h1 class="text-4xl md:text-5xl font-extrabold text-blue-800 mb-4" id="share-entity-name">Loading Company Shares...</h1>
+            <p class="text-lg md:text-xl text-gray-700">Entity Common Stock Shares Outstanding (Fiscal Year > 2020)</p>
+        </header>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <!-- Max Shares Card -->
+            <div class="bg-white rounded-lg shadow-xl p-6 border-b-4 border-green-500">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">Maximum Shares Outstanding</h2>
+                <p class="text-5xl font-mono text-green-700 mb-2" id="share-max-value">N/A</p>
+                <p class="text-lg text-gray-600">Fiscal Year: <span class="font-semibold" id="share-max-fy">N/A</span></p>
+            </div>
+
+            <!-- Min Shares Card -->
+            <div class="bg-white rounded-lg shadow-xl p-6 border-b-4 border-red-500">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">Minimum Shares Outstanding</h2>
+                <p class="text-5xl font-mono text-red-700 mb-2" id="share-min-value">N/A</p>
+                <p class="text-lg text-gray-600">Fiscal Year: <span class="font-semibold" id="share-min-fy">N/A</span></p>
+            </div>
+        </div>
+
+        <footer class="text-center mt-12 text-gray-500 text-sm">
+            <p>Data provided by the U.S. Securities and Exchange Commission (SEC).</p>
+            <p>User-Agent: CompanySharesApp / contact@example.com (replace with your actual contact info)</p>
+            <p>For educational purposes only. Not financial advice.</p>
+        </footer>
+    </div>
+
+    <script>
+        const userAgent = 'CompanySharesApp / contact@example.com'; // SEC Guidance: Provide a descriptive User-Agent
+
+        async function fetchCompanyData(cik) {
+            const url = `https://data.sec.gov/api/xbrl/companyconcept/CIK${cik}/dei/EntityCommonStockSharesOutstanding.json`;
+            try {
+                const response = await fetch(url, {
+                    headers: {
+                        'User-Agent': userAgent
+                    }
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`HTTP error! Status: ${response.status}. Response: ${errorText.substring(0, 100)}...`);
+                }
+                const data = await response.json();
+
+                const entityName = data.entityName;
+                document.title = `${entityName} Shares Outstanding`;
+                document.getElementById('share-entity-name').textContent = `${entityName} Shares Outstanding`;
+
+                const sharesData = data.units.shares;
+                if (!sharesData || sharesData.length === 0) {
+                    throw new Error('No shares data found.');
+                }
+
+                const filteredShares = sharesData.filter(entry => {
+                    const fy = parseInt(entry.fy, 10);
+                    return fy > 2020 && typeof entry.val === 'number' && !isNaN(entry.val);
+                });
+
+                if (filteredShares.length === 0) {
+                    throw new Error('No shares data found after filtering for FY > 2020.');
+                }
+
+                let maxShare = { val: -Infinity, fy: null };
+                let minShare = { val: Infinity, fy: null };
+
+                filteredShares.forEach(entry => {
+                    if (entry.val > maxShare.val) {
+                        maxShare = { val: entry.val, fy: entry.fy };
+                    }
+                    if (entry.val < minShare.val) {
+                        minShare = { val: entry.val, fy: entry.fy };
+                    }
+                });
+
+                document.getElementById('share-max-value').textContent = maxShare.val.toLocaleString();
+                document.getElementById('share-max-fy').textContent = maxShare.fy;
+                document.getElementById('share-min-value').textContent = minShare.val.toLocaleString();
+                document.getElementById('share-min-fy').textContent = minShare.fy;
+
+            } catch (error) {
+                console.error('Failed to fetch or process company data:', error);
+                document.title = 'Error Loading Data';
+                document.getElementById('share-entity-name').textContent = `Error: ${error.message}`;
+                document.getElementById('share-max-value').textContent = 'Error';
+                document.getElementById('share-max-fy').textContent = 'N/A';
+                document.getElementById('share-min-value').textContent = 'Error';
+                document.getElementById('share-min-fy').textContent = 'N/A';
+            }
+        }
+
+        // Get CIK from URL parameter or use default (Becton Dickinson)
+        const urlParams = new URLSearchParams(window.location.search);
+        const cikParam = urlParams.get('CIK');
+        const initialCik = cikParam || '0000010795';
+
+        // Load data on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchCompanyData(initialCik);
+        });
+    </script>
+</body>
+</html>
